@@ -1082,7 +1082,8 @@ pub async fn handle_ai_agent_job(
                     let derived_description: Option<String>;
                     let schema = match hash {
                         Some(hash) => {
-                            let (_, metadata) = cache::script::fetch(conn, hash.clone()).await?;
+                            let (_, metadata) =
+                                cache::script::fetch(conn, &job.workspace_id, hash.clone()).await?;
                             derived_description =
                                 fetch_script_description(db, &job.workspace_id, hash.0).await;
                             Ok::<_, Error>(
@@ -1125,7 +1126,8 @@ pub async fn handle_ai_agent_job(
                                 });
                                 derived_description =
                                     fetch_script_description(db, &job.workspace_id, hash.0).await;
-                                let (_, metadata) = cache::script::fetch(conn, hash).await?;
+                                let (_, metadata) =
+                                    cache::script::fetch(conn, &job.workspace_id, hash).await?;
                                 Ok(metadata
                                     .schema
                                     .clone()

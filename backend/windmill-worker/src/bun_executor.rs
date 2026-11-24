@@ -2201,7 +2201,7 @@ async fn collect_transitive_import_versions(
         versions.push((path.clone(), hash));
         let imports = match RELATIVE_IMPORTS_PER_HASH.get(&hash) {
             Some(imports) => imports,
-            None => match cache::script::fetch(&conn, ScriptHash(hash)).await {
+            None => match cache::script::fetch(&conn, w_id, ScriptHash(hash)).await {
                 Ok((data, meta)) => {
                     let imports = Arc::new(match meta.language {
                         Some(ScriptLang::Bun)

@@ -49,17 +49,25 @@ pub struct JobExtended<T: JobCommon> {
 
 pub trait JobCommon {
     fn job_kind(&self) -> &JobKind;
+    /// The workspace the job belongs to: raw-value resolution scopes script lookups by it.
+    fn workspace_id(&self) -> &str;
 }
 
 impl JobCommon for QueuedJob {
     fn job_kind(&self) -> &JobKind {
         &self.job_kind
     }
+    fn workspace_id(&self) -> &str {
+        &self.workspace_id
+    }
 }
 
 impl JobCommon for CompletedJob {
     fn job_kind(&self) -> &JobKind {
         &self.job_kind
+    }
+    fn workspace_id(&self) -> &str {
+        &self.workspace_id
     }
 }
 

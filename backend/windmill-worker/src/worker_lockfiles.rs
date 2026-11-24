@@ -352,15 +352,26 @@ pub async fn handle_dependency_job(
         // dependency job's lock, which lands in place. A run resolving to it on this worker
         // would then get no lock from the cache at all.
         Some(hash) if triggered_by_relative_import => {
-            let raw = cache::script::fetch_script_from_db(db, hash, std::panic::Location::caller())
-                .await?;
+            let raw = cache::script::fetch_script_from_db(
+                db,
+                w_id,
+                hash,
+                std::panic::Location::caller(),
+            )
+            .await?;
             Cow::Owned(std::sync::Arc::new(cache::ScriptData {
                 lock: raw.lock,
                 code: raw.content,
                 modules: raw.modules,
             }))
         }
-        Some(hash) => match cache::script::fetch(&Connection::from(db.clone()), hash).await {
+        Some(hash) => match cache::script::fetch(
+            &Connection::from(db.clone()),
+            &job.workspace_id,
+            hash,
+        )
+        .await
+        {
             Ok(d) => Cow::Owned(d.0),
             Err(e) => {
                 // The live version of a relative-import relock is what runs resolve to, and
@@ -600,7 +611,7 @@ pub async fn handle_dependency_job(
                 // `lock` has been updated; invalidate the cache.
                 // Since only worker that ran this Dependency Job has the cache
                 // we do not need to think about invalidating cache for other workers.
-                cache::script::invalidate(current_hash);
+                cache::script::invalidate(w_id, current_hash);
                 current_hash
             };
             // The version only became runnable now, so this process still resolves the path to

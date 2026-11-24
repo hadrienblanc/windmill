@@ -2934,7 +2934,7 @@ impl DeletedScriptVersions {
     pub fn evict_with(self, also: impl Fn(&Self) + Send + 'static) {
         let evict = move || {
             for hash in &self.hashes {
-                cache::script::invalidate(ScriptHash(*hash));
+                cache::script::invalidate(&self.workspace_id, ScriptHash(*hash));
                 DEPLOYED_SCRIPT_INFO_CACHE.remove(&(self.workspace_id.clone(), *hash));
             }
             for path in &self.paths {

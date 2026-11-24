@@ -5724,10 +5724,10 @@ pub async fn get_hub_script_content_and_requirements(
 
 pub async fn get_script_content_by_hash(
     script_hash: &ScriptHash,
-    _w_id: &str,
+    w_id: &str,
     conn: &Connection,
 ) -> error::Result<ContentReqLangEnvs> {
-    let (data, metadata) = cache::script::fetch(conn, *script_hash).await?;
+    let (data, metadata) = cache::script::fetch(conn, w_id, *script_hash).await?;
     Ok(ContentReqLangEnvs {
         content: data.code.clone(),
         lockfile: data.lock.clone(),
@@ -5987,7 +5987,7 @@ async fn handle_code_execution_job(
                 .and_then(|x| hash_to_codebase_id(&job.id.to_string(), x.0));
             if codebase.is_none() && job.runnable_id.is_some() {
                 (arc_data, arc_metadata) =
-                    Box::pin(cache::script::fetch(conn, job.runnable_id.unwrap())).await?;
+                    Box::pin(cache::script::fetch(conn, &job.workspace_id, job.runnable_id.unwrap())).await?;
                 (arc_data.as_ref(), arc_metadata.as_ref())
             } else {
                 arc_data =
@@ -6015,7 +6015,8 @@ async fn handle_code_execution_job(
             (&data, &metadata)
         }
         JobKind::Script => {
-            (arc_data, arc_metadata) = Box::pin(cache::script::fetch(conn, script_hash()?)).await?;
+            (arc_data, arc_metadata) =
+                Box::pin(cache::script::fetch(conn, &job.workspace_id, script_hash()?)).await?;
             (arc_data.as_ref(), arc_metadata.as_ref())
         }
         JobKind::FlowScript => {
@@ -6084,7 +6085,8 @@ async fn handle_code_execution_job(
                     .ok_or_else(|| Error::internal_err("expected script hash".to_string()))?;
 
                     (arc_data, arc_metadata) =
-                        Box::pin(cache::script::fetch(conn, ScriptHash(hash))).await?;
+                        Box::pin(cache::script::fetch(conn, &job.workspace_id, ScriptHash(hash)))
+                            .await?;
                     (arc_data.as_ref(), arc_metadata.as_ref())
                 }
             }

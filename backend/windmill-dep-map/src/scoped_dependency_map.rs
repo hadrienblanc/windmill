@@ -422,7 +422,7 @@ SELECT importer_node_id, imported_path, imported_lockfile_hash
             .fetch_all(db)
             .await?
             {
-                let (sd, smd) = cache::script::fetch(&db.clone().into(), r.hash.into()).await?;
+                let (sd, smd) = cache::script::fetch(&db.clone().into(), w_id, r.hash.into()).await?;
                 let mut dmap = ScopedDependencyMap::fetch(w_id, &r.path, "script", db).await?;
                 let mut tx = db.begin().await?;
 

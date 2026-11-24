@@ -33,10 +33,10 @@ async fn seed_script(
     language: &str,
 ) -> anyhow::Result<i64> {
     // Hash needs to be unique per (workspace, hash). Derive from path AND
-    // content: the worker's script cache (`cache::script::fetch`) is keyed
-    // by hash alone and is process-global, so tests running in the same
-    // process that seed the same path with different content would poison
-    // each other's cache if the hash came from the path only.
+    // content: the worker's script cache (`cache::script::fetch`) is
+    // process-global, so tests running in the same process that seed the same
+    // path with different content would poison each other's cache if the hash
+    // came from the path only.
     let mut h = 0i64;
     for b in path.bytes().chain(content.bytes()) {
         h = h.wrapping_mul(31).wrapping_add(b as i64);
