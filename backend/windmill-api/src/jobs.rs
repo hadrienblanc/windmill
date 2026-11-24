@@ -2748,7 +2748,7 @@ impl<'a> GetQuery<'a> {
             // `fetch_script` resolves FlowScript / AppScript via their runnable_id; for
             // Preview jobs it returns early and we fall through to `fetch_preview_script`.
             let conn = Connection::from(db.clone());
-            cache::job::fetch_script(db.clone(), job.job_kind(), hash)
+            cache::job::fetch_script(db.clone(), job.inner.workspace_id(), job.job_kind(), hash)
                 .or_else(|_| cache::job::fetch_preview_script(&conn, &id, raw_lock, raw_code))
                 .await
                 .ok()

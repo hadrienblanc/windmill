@@ -636,7 +636,7 @@ pub mod script {
     make_static! {
         /// Scripts cache.
         /// FIXME: Use `Arc<Val>` for cheap cloning.
-        static ref CACHE: { ScriptHash => ScriptFull } in "script_2" <= 1000;
+        static ref CACHE: { (String, ScriptHash) => ScriptFull } in "script_2" <= 1000;
     }
 
     /// Clear the script cache.
@@ -644,13 +644,14 @@ pub mod script {
         CACHE.clear();
     }
 
-    /// Fetch the script referenced by `hash` from the cache.
+    /// Fetch the script referenced by `hash` for `w_id` from the cache.
     /// If not present, import from the file-system cache or fetch it from the database and write
     /// it to the file system and cache.
     /// This should be preferred over fetching the database directly.
     #[track_caller]
     pub fn fetch(
         conn: &Connection,
+        w_id: &str,
         hash: ScriptHash,
     ) -> impl Future<Output = error::Result<(Arc<ScriptData>, Arc<ScriptMetadata>)>> {
         // If not present, `get_or_insert_async` will lock the key until the future completes,
@@ -658,12 +659,21 @@ pub mod script {
         // the file system and cache, hence no race on the file system.
         let loc = Location::caller();
         let conn = conn.clone();
-        let fut = CACHE.get_or_insert_async(hash, async move {
+        // Owned so the returned future captures no borrow of the caller's workspace id.
+        let w_id = w_id.to_string();
+        let key = (w_id.clone(), hash);
+        let fut = CACHE.get_or_insert_async(key, async move {
             match conn {
-                Connection::Sql(db) => fetch_script_from_db(&db, hash, loc).await,
+                Connection::Sql(db) => fetch_script_from_db(&db, &w_id, hash, loc).await,
                 Connection::Http(client) => {
+                    // The agent-worker endpoint resolves by hash alone today and ignores the
+                    // workspace parameter; sending it keeps this client correct the day the
+                    // server learns it.
                     let r = client
-                        .get::<RawScriptApi>(&format!("/api/agent_workers/script/{}", hash.0))
+                        .get::<RawScriptApi>(&format!(
+                            "/api/agent_workers/script/{}?workspace_id={}",
+                            hash.0, w_id
+                        ))
                         .await?;
                     Ok(r.into())
                 }
@@ -674,6 +684,7 @@ pub mod script {
 
     pub async fn fetch_script_from_db(
         db: &DB,
+        w_id: &str,
         hash: ScriptHash,
         loc: &'static Location<'_>,
     ) -> error::Result<RawScript> {
@@ -689,8 +700,9 @@ pub mod script {
                 codebase LIKE '%.esm%' as is_esm, \
                 modules AS \"modules: serde_json::Value\", \
                 deleted \
-            FROM script WHERE hash = $1 ORDER BY deleted LIMIT 1",
-            hash.0
+            FROM script WHERE hash = $1 AND workspace_id = $2 ORDER BY deleted LIMIT 1",
+            hash.0,
+            w_id
         )
         .fetch_optional(db)
         .await
@@ -698,8 +710,12 @@ pub mod script {
         .and_then(unwrap_or_error(&loc, "Script", hash))
         .and_then(|r| {
             // The hash leaves out the workspace, so forks and clones share it, and a deleted
-            // copy keeps its row with the content wiped. Any live copy holds the same code;
-            // only when every copy is deleted is there nothing left to run.
+            // copy keeps its row with the content wiped. Two workspaces can also deploy the
+            // same content independently: each lock is computed after the hash by its own
+            // workspace's dependency job, so rows sharing a hash can hold different locks —
+            // resolution is scoped to the workspace so a run gets the lock its workspace
+            // deployed. Within one workspace, only when every copy is deleted is there
+            // nothing left to run.
             if r.deleted {
                 return Err(error::Error::NotFound(format!(
                     "Script version {hash} was deleted"
@@ -756,9 +772,9 @@ pub mod script {
         })
     }
 
-    /// Invalidate the script cache for the given `hash`.
-    pub fn invalidate(hash: ScriptHash) {
-        let _ = CACHE.remove(&hash);
+    /// Invalidate the script cache for the given `hash` in `w_id`.
+    pub fn invalidate(w_id: &str, hash: ScriptHash) {
+        let _ = CACHE.remove(&(w_id.to_string(), hash));
     }
 }
 
@@ -946,20 +962,25 @@ pub mod job {
     #[track_caller]
     pub fn fetch_script(
         db: DB,
+        w_id: &str,
         kind: &JobKind,
         hash: Option<ScriptHash>,
     ) -> impl Future<Output = error::Result<Arc<ScriptData>>> {
         use JobKind::*;
         let loc = Location::caller();
         let kind = kind.clone();
+        // Owned so the returned future captures no borrow of the caller's workspace id.
+        let w_id = w_id.to_string();
         async move {
             match (kind, hash.map(|ScriptHash(id)| id)) {
                 (FlowScript, Some(id)) => {
                     flow::fetch_script(&Connection::Sql(db.clone()), FlowNodeId(id)).await
                 }
-                (Script | Dependencies, Some(hash)) => script::fetch(&db.into(), ScriptHash(hash))
-                    .await
-                    .map(|(data, _meta)| data),
+                (Script | Dependencies, Some(hash)) => {
+                    script::fetch(&db.into(), &w_id, ScriptHash(hash))
+                        .await
+                        .map(|(data, _meta)| data)
+                }
                 (AppScript, Some(id)) => {
                     app::fetch_script(&Connection::Sql(db.clone()), AppScriptId(id)).await
                 }
@@ -1323,6 +1344,7 @@ const _: () = {
         (Uuid, |x| format!("{:032x}", x.as_u128())),
         (ScriptHash, |x| format!("{:016x}", x.0)),
         ((u8, ScriptHash), |x| format!("{:02x}-{:016x}", x.0, x.1.0)),
+        ((String, ScriptHash), |x| format!("{}-{:016x}", x.0, x.1.0)),
         (FlowNodeId, |x| format!("{:016x}", x.0)),
         (AppScriptId, |x| format!("{:016x}", x.0)),
         ((i64, String), |x| format!("{}-{}", x.1, x.0)),

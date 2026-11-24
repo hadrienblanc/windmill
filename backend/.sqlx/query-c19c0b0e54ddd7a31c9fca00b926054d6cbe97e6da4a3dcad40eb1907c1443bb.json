@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT content AS \"content!: String\",\n                lock AS \"lock: String\", language AS \"language: Option<ScriptLang>\", envs AS \"envs: Vec<String>\", schema AS \"schema: String\", schema_validation AS \"schema_validation: bool\", codebase LIKE '%.tar' as use_tar, codebase LIKE '%.esm%' as is_esm, modules AS \"modules: serde_json::Value\", deleted FROM script WHERE hash = $1 ORDER BY deleted LIMIT 1",
+  "query": "SELECT content AS \"content!: String\",\n                lock AS \"lock: String\", language AS \"language: Option<ScriptLang>\", envs AS \"envs: Vec<String>\", schema AS \"schema: String\", schema_validation AS \"schema_validation: bool\", codebase LIKE '%.tar' as use_tar, codebase LIKE '%.esm%' as is_esm, modules AS \"modules: serde_json::Value\", deleted FROM script WHERE hash = $1 AND workspace_id = $2 ORDER BY deleted LIMIT 1",
   "describe": {
     "columns": [
       {
@@ -89,7 +89,8 @@
     ],
     "parameters": {
       "Left": [
-        "Int8"
+        "Int8",
+        "Text"
       ]
     },
     "nullable": [
@@ -105,5 +106,5 @@
       false
     ]
   },
-  "hash": "65e33a933ed8568c82f9b4e121b9ba4280123fe22a959d4d3d978ca767aeed29"
+  "hash": "c19c0b0e54ddd7a31c9fca00b926054d6cbe97e6da4a3dcad40eb1907c1443bb"
 }

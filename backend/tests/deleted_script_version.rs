@@ -1,5 +1,6 @@
-//! Script data is cached by hash, and the hash leaves out the workspace, so forks and clones
-//! share it: a deleted copy in one workspace must not stop the live copy in another.
+//! Script data is cached by (workspace, hash), and the hash leaves out the workspace, so forks
+//! and clones share it: a deleted copy in one workspace must not stop the live copy in another,
+//! and each workspace resolves its own row.
 
 use sqlx::{Pool, Postgres};
 use windmill_common::{cache, scripts::ScriptHash, worker::Connection};
@@ -24,10 +25,12 @@ async fn a_deleted_copy_does_not_shadow_a_live_one(db: Pool<Postgres>) {
     .unwrap();
 
     let conn = Connection::Sql(db.clone());
-    let (data, _) = cache::script::fetch(&conn, ScriptHash(SHARED))
+    let (data, _) = cache::script::fetch(&conn, "test-workspace", ScriptHash(SHARED))
         .await
         .unwrap();
     assert_eq!(data.code, "echo shared");
+    // The fork's only copy is deleted: resolving there finds nothing left to run.
+    assert!(cache::script::fetch(&conn, "fork", ScriptHash(SHARED)).await.is_err());
 }
 
 #[sqlx::test(fixtures("base"))]
