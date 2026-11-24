@@ -55,6 +55,15 @@ export async function publicGet<T>(path: string): Promise<T> {
 }
 
 export async function getUserExtOrUndefined(workspace: string): Promise<UserExt | undefined> {
+	// `token` is HttpOnly and invisible to JS; `wm_session` is its readable companion
+	// (session_hint.rs), set to an empty value on logout, so only a non-empty value says
+	// the visitor holds a session. Without one, whoami is a guaranteed 401 — answer
+	// undefined without firing it (issue #7549).
+	if (
+		typeof document !== 'undefined' &&
+		!/(?:^|;\s*)wm_session=[^;]+/.test(document.cookie)
+	)
+		return undefined
 	try {
 		return mapUserToUserExt(
 			await publicGet<User>(`/w/${encodeURI(workspace)}/users/whoami`),

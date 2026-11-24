@@ -194,7 +194,12 @@
 					get(w + '/apps_u/embed_token/' + pub[2])
 					warmBundle(get(w + '/apps_u/public_app/' + pub[2]), pub[1])
 					get(w + '/apps_u/guest_entry/' + pub[2])
-					get(w + '/users/whoami')
+					// Only a cookie session can answer whoami. For an anonymous visitor
+					// of a public app the call is a guaranteed 401, and security monitors
+					// read that burst as brute force (issue #7549). `wm_session` is the
+					// readable companion of the HttpOnly session cookie; it is set to an
+					// empty value on logout, so an empty value must not count.
+					if (/(?:^|;\s*)wm_session=[^;]+/.test(document.cookie)) get(w + '/users/whoami')
 				} else if (custom && custom[1].indexOf('.') === -1) {
 					// A `.` marks a trailing JWT segment, which no custom path contains.
 					get('/api/apps_u/embed_token_by_custom_path/' + custom[1])
