@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.883.1](https://github.com/windmill-labs/windmill/compare/v1.883.0...v1.883.1) (2026-11-24)
+
+
+### Bug Fixes
+
+* suggest filter values by their label and in any case ([#12582](https://github.com/windmill-labs/windmill/issues/12582)) ([cf8a1c3](https://github.com/windmill-labs/windmill/commit/cf8a1c38500e64567e5e8fd496feee5bf2e3b0b7))
+
 ## [1.883.0](https://github.com/windmill-labs/windmill/compare/v1.882.0...v1.883.0) (2026-11-24)
 
 
